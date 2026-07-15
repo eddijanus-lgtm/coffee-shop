@@ -7,21 +7,24 @@
     <meta name="theme-color" content="#fbf5f1" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="stylesheet" href="./gallery-v4.css?v=gallery-copy-v4-2" />
+    <link rel="stylesheet" href="./story-inline-v1.css?v=story-inline-v1" />
     <meta property="og:title" content="Maison Fleur & Café · Paris" />
     <meta property="og:description" content="Coffee, flowers and slow mornings in Le Marais." />
     <meta property="og:image" content="https://eddijanus-lgtm.github.io/coffee-shop/images/5AC0300D-E665-42A7-92BC-8718279A7FFB.png?v=correct-mapping-v3" />
     <meta name="description" content="Maison Fleur & Café — coffee, flowers and slow mornings in Le Marais, Paris." />
-    <meta name="maison-image-release" content="story-cafe-v1" />
+    <meta name="maison-image-release" content="correct-mapping-v3" />
     <meta name="maison-gallery-release" content="gallery-copy-v4" />
+    <meta name="maison-story-release" content="story-inline-v1" />
     <title>Maison Fleur & Café · Paris</title>
   </head>
   <body>
     <div id="root"></div>
     <script>
       (() => {
-        const deploymentMarker = 'story-cafe-v1'
-        const assetVersion = 'story-cafe-v1-20260715'
+        const deploymentMarker = 'correct-mapping-v3'
+        const assetVersion = 'story-inline-v1-20260715'
         const galleryVersion = 'gallery-copy-v4'
+        const storyVersion = 'story-inline-v1'
         const assignments = [
           { selector: '.hero-photo img', file: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png', eager: true },
           { selector: '.feature-dish img', file: '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png', eager: true },
@@ -84,6 +87,25 @@
           document.documentElement.dataset.maisonGallery = galleryVersion
         }
 
+        const enhanceStory = () => {
+          const storyCopy = document.querySelector('.story-copy')
+          const heading = storyCopy?.querySelector('#story-title')
+          if (!storyCopy || !heading) return
+          let figure = storyCopy.querySelector('.story-inline-photo')
+          if (!figure) {
+            figure = document.createElement('figure')
+            figure.className = 'story-inline-photo'
+            const image = document.createElement('img')
+            image.src = imageUrl('story-cafe.webp')
+            image.alt = 'Cappuccino, Croissant und Blumen auf einem Tisch im Maison Fleur & Café'
+            image.loading = 'eager'
+            image.decoding = 'async'
+            figure.append(image)
+            heading.insertAdjacentElement('afterend', figure)
+          }
+          document.documentElement.dataset.maisonStory = storyVersion
+        }
+
         const applyImages = () => {
           let found = 0
           for (const assignment of assignments) {
@@ -100,6 +122,7 @@
             image.src = target
           }
           enhanceGallery()
+          enhanceStory()
           if (found === assignments.length) {
             document.documentElement.dataset.maisonImages = deploymentMarker
           }
