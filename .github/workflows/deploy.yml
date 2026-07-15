@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_RELEASE: story-cafe-v1
+  IMAGE_RELEASE: story-inline-v1
 
 jobs:
   build:
@@ -32,11 +32,12 @@ jobs:
       - run: npm install
       - run: npm run lint
       - run: npm run build
-      - name: Verify story image build
+      - name: Verify inline story image build
         run: |
           grep -q "$IMAGE_RELEASE" dist/index.html
           ! grep -q 'images.unsplash.com' dist/index.html
           test -s dist/images/story-cafe.webp
+          test -s dist/story-inline-v1.css
           test -s dist/images/5AC0300D-E665-42A7-92BC-8718279A7FFB.png
           test -s dist/images/3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png
       - uses: actions/upload-pages-artifact@v3
@@ -76,6 +77,6 @@ jobs:
               sha: context.sha,
               state: success ? 'success' : 'failure',
               context: 'github-pages/maison-fleur',
-              description: success ? 'Story café image published' : 'Pages deployment failed',
+              description: success ? 'Inline story café image published' : 'Pages deployment failed',
               target_url: success && process.env.PAGE_URL ? process.env.PAGE_URL : runUrl,
             });
