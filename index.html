@@ -8,53 +8,97 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta property="og:title" content="Maison Fleur & Café · Paris" />
     <meta property="og:description" content="Coffee, flowers and slow mornings in Le Marais." />
-    <meta property="og:image" content="https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1600&q=85&fm=jpg" />
+    <meta property="og:image" content="https://eddijanus-lgtm.github.io/coffee-shop/images/0E29E7A1-D2BC-422D-A488-53D3187AEB93.png?v=exact-uploaded-ten" />
     <meta name="description" content="Maison Fleur & Café — coffee, flowers and slow mornings in Le Marais, Paris." />
+    <meta name="maison-image-release" content="exact-uploaded-ten" />
     <title>Maison Fleur & Café · Paris</title>
   </head>
   <body>
     <div id="root"></div>
     <script>
       (() => {
-        const freshImages = {
-          'barista-interior.webp': 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1600&q=85&fm=jpg',
-          'brunch-closeup.webp': 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1400&q=85&fm=jpg',
-          'terrace.webp': 'https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1600&q=85&fm=jpg',
-          'window-seat.webp': 'https://images.unsplash.com/photo-1445116572660-236099ec97a0?auto=format&fit=crop&w=1400&q=85&fm=jpg',
-        }
+        const release = 'exact-uploaded-ten-abbefdbc'
+        const base = '/coffee-shop/images/'
+        const uploadedFiles = [
+          '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png',
+          '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png',
+          '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png',
+          '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png',
+          '5AC0300D-E665-42A7-92BC-8718279A7FFB.png',
+          '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png',
+          '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png',
+          'C41807AE-BD67-48D9-97AB-DB646F1505AF.png',
+          'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png',
+          'IMG_4392.jpeg',
+        ]
 
-        const fallback = 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1400&q=85&fm=jpg'
+        const sourceFor = (file) => `${base}${file}?v=${release}`
 
-        const replaceImage = (image) => {
-          const rawSource = image.getAttribute('src') || ''
-          const fileName = rawSource.split('/').pop()?.split('?')[0]
-          const target = fileName ? freshImages[fileName] : undefined
-          if (!target || image.dataset.freshCafeImage === 'true') return
-
-          image.dataset.freshCafeImage = 'true'
-          image.referrerPolicy = 'no-referrer'
-          image.onerror = () => {
-            image.onerror = null
-            image.src = fallback
-          }
-          image.src = target
-        }
-
-        const replaceAllImages = (root = document) => {
-          root.querySelectorAll?.('img').forEach(replaceImage)
-          if (root instanceof HTMLImageElement) replaceImage(root)
-        }
-
-        const observer = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
-            mutation.addedNodes.forEach((node) => {
-              if (node instanceof Element) replaceAllImages(node)
-            })
+        const loadAssets = () => Promise.all(uploadedFiles.map((file) => new Promise((resolve) => {
+          const probe = new Image()
+          probe.onload = () => resolve({
+            file,
+            source: sourceFor(file),
+            landscape: probe.naturalWidth >= probe.naturalHeight,
           })
-        })
+          probe.onerror = () => resolve({ file, source: sourceFor(file), landscape: false })
+          probe.src = sourceFor(file)
+        })))
 
-        observer.observe(document.documentElement, { childList: true, subtree: true })
-        window.addEventListener('DOMContentLoaded', () => replaceAllImages())
+        const setImage = (image, asset, priority = false) => {
+          if (!image || !asset || image.dataset.maisonExactImage === asset.file) return
+          image.dataset.maisonExactImage = asset.file
+          image.decoding = 'async'
+          image.loading = priority ? 'eager' : 'lazy'
+          if (priority) image.fetchPriority = 'high'
+          image.src = asset.source
+        }
+
+        loadAssets().then((assets) => {
+          const landscape = assets.filter((asset) => asset.landscape)
+          const portrait = assets.filter((asset) => !asset.landscape)
+          const take = (group, index) => group[index % group.length] || assets[index % assets.length]
+
+          const apply = () => {
+            setImage(document.querySelector('.hero-photo img'), take(landscape, 0), true)
+            setImage(document.querySelector('.feature-dish img'), take(portrait, 0))
+
+            document.querySelectorAll('.menu-card img').forEach((image, index) => {
+              setImage(image, take(portrait, index + 1))
+            })
+
+            document.querySelectorAll('.moment-card--wide img').forEach((image, index) => {
+              setImage(image, take(landscape, index + 1))
+            })
+
+            document.querySelectorAll('.moment-card--tall img').forEach((image, index) => {
+              setImage(image, take(portrait, index + 4))
+            })
+
+            setImage(document.querySelector('.story-photo img'), take(landscape, 3))
+            setImage(document.querySelector('.visit-photo img'), take(landscape, 0))
+            setImage(document.querySelector('.reservation-photo img'), take(landscape, 2))
+
+            document.documentElement.dataset.maisonImages = 'exact-uploaded-ten'
+          }
+
+          let scheduled = false
+          const scheduleApply = () => {
+            if (scheduled) return
+            scheduled = true
+            requestAnimationFrame(() => {
+              scheduled = false
+              apply()
+            })
+          }
+
+          const observer = new MutationObserver(scheduleApply)
+          observer.observe(document.documentElement, { childList: true, subtree: true })
+          window.addEventListener('DOMContentLoaded', scheduleApply, { once: true })
+          scheduleApply()
+          setTimeout(scheduleApply, 250)
+          setTimeout(scheduleApply, 1000)
+        })
       })()
     </script>
     <script type="module" src="/src/main.tsx"></script>
