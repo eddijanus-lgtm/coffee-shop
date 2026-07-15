@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_RELEASE: exact-uploaded-ten-abbefdbc
+  IMAGE_RELEASE: correct-mapping-v3
 
 jobs:
   build:
@@ -69,11 +69,17 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Verify the exact image release inside the Pages artifact
+      - name: Verify the corrected mapping inside the Pages artifact
         shell: bash
         run: |
           set -euo pipefail
           grep -q "$IMAGE_RELEASE" dist/index.html
+          grep -q "'.hero-photo img', file: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png'" dist/index.html
+          grep -q "'.feature-dish img', file: '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png'" dist/index.html
+          grep -q "'.moment-card:nth-child(1) img', file: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png'" dist/index.html
+          grep -q "'.moment-card:nth-child(3) img', file: '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png'" dist/index.html
+          grep -q "'.moment-card:nth-child(4) img', file: '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png'" dist/index.html
+          grep -q "'.reservation-photo img', file: '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png'" dist/index.html
           if grep -q 'images.unsplash.com' dist/index.html; then
             echo 'External Unsplash images are still present.'
             exit 1
@@ -116,6 +122,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy
     steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Verify live HTML and all ten uploaded image URLs
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
@@ -146,7 +156,7 @@ jobs:
               break
             fi
             if [ "$attempt" = 18 ]; then
-              echo 'The exact uploaded-image HTML did not become live.'
+              echo 'The corrected image-mapping HTML did not become live.'
               exit 1
             fi
             sleep 10
@@ -165,6 +175,98 @@ jobs:
             esac
             echo "Live image verified: $file_name ($mime, $(wc -c < "$target") bytes)"
           done
+
+      - name: Capture rendered desktop and mobile pages
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        shell: bash
+        run: |
+          npm install --no-save --ignore-scripts playwright-core
+          mkdir -p render-audit
+          node <<'JS'
+          const { chromium } = require('playwright-core')
+          const fs = require('fs')
+
+          const base = process.env.PAGE_URL.replace(/\/$/, '')
+          const release = process.env.IMAGE_RELEASE
+          const expected = {
+            hero: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png',
+            feature: '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png',
+            menu1: '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png',
+            menu2: 'IMG_4392.jpeg',
+            menu3: '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png',
+            moment1: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png',
+            moment2: 'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png',
+            moment3: '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png',
+            moment4: '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png',
+            story: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png',
+            visit: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png',
+            reservation: '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png',
+          }
+          const selectors = {
+            hero: '.hero-photo img',
+            feature: '.feature-dish img',
+            menu1: '.menu-card:nth-child(1) img',
+            menu2: '.menu-card:nth-child(2) img',
+            menu3: '.menu-card:nth-child(3) img',
+            moment1: '.moment-card:nth-child(1) img',
+            moment2: '.moment-card:nth-child(2) img',
+            moment3: '.moment-card:nth-child(3) img',
+            moment4: '.moment-card:nth-child(4) img',
+            story: '.story-photo img',
+            visit: '.visit-photo img',
+            reservation: '.reservation-photo img',
+          }
+
+          ;(async () => {
+            const browser = await chromium.launch({
+              executablePath: '/usr/bin/google-chrome',
+              headless: true,
+              args: ['--no-sandbox', '--disable-dev-shm-usage'],
+            })
+            const audit = {}
+            for (const [name, viewport] of Object.entries({
+              desktop: { width: 1440, height: 1200 },
+              mobile: { width: 390, height: 844 },
+            })) {
+              const page = await browser.newPage({ viewportSize: viewport })
+              await page.goto(`${base}/?release=${release}-${Date.now()}`, { waitUntil: 'networkidle', timeout: 120000 })
+              await page.waitForFunction(
+                marker => document.documentElement.dataset.maisonImages === marker,
+                release,
+                { timeout: 30000 },
+              )
+              await page.waitForFunction(
+                () => [...document.images].every(image => image.complete && image.naturalWidth > 0),
+                null,
+                { timeout: 120000 },
+              )
+              const mapping = {}
+              for (const [key, selector] of Object.entries(selectors)) {
+                const source = await page.locator(selector).getAttribute('src')
+                if (!source || !source.includes(expected[key])) {
+                  throw new Error(`${name}: ${key} expected ${expected[key]}, received ${source}`)
+                }
+                mapping[key] = source
+              }
+              audit[name] = mapping
+              await page.screenshot({ path: `render-audit/maison-${name}.png`, fullPage: true })
+              await page.close()
+            }
+            fs.writeFileSync('render-audit/mapping.json', JSON.stringify(audit, null, 2))
+            await browser.close()
+          })().catch(error => {
+            console.error(error)
+            process.exit(1)
+          })
+          JS
+
+      - name: Upload rendered QA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-image-mapping
+          path: render-audit
+          if-no-files-found: error
 
   report:
     if: always()
@@ -188,6 +290,6 @@ jobs:
               sha: context.sha,
               state: success ? 'success' : 'failure',
               context: 'github-pages/maison-fleur',
-              description: success ? 'All ten uploaded café images are live' : 'Uploaded-image deployment failed',
-              target_url: success && process.env.PAGE_URL ? process.env.PAGE_URL : runUrl,
+              description: success ? 'Correct image mapping rendered and verified' : 'Correct image mapping verification failed',
+              target_url: runUrl,
             });
