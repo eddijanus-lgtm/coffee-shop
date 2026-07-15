@@ -20,27 +20,59 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Restore real image binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image in public/images/barista-interior.webp public/images/brunch-closeup.webp public/images/terrace.webp public/images/window-seat.webp; do
+            if [ ! -s "$image" ]; then
+              echo "Missing image source: $image"
+              exit 1
+            fi
+
+            # Earlier uploads stored the WebP bytes as Base64 text. Decode them
+            # into real binary WebP files before Vite copies public/ to dist/.
+            if head -c 8 "$image" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
+              base64 --decode --ignore-garbage "$image" > "$image.decoded"
+              mv "$image.decoded" "$image"
+            fi
+
+            test "$(head -c 4 "$image")" = "RIFF"
+            test "$(dd if="$image" bs=1 skip=8 count=4 status=none)" = "WEBP"
+            echo "Verified binary image: $image ($(wc -c < "$image") bytes)"
+          done
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
       - name: Install dependencies
         run: npm install
+
       - name: Lint
         run: npm run lint
+
       - name: Build
         run: npm run build
+
       - name: Verify generated café images are in the Pages artifact
+        shell: bash
         run: |
-          test -s dist/images/barista-interior.webp
-          test -s dist/images/brunch-closeup.webp
-          test -s dist/images/terrace.webp
-          test -s dist/images/window-seat.webp
+          set -euo pipefail
+          for image in dist/images/barista-interior.webp dist/images/brunch-closeup.webp dist/images/terrace.webp dist/images/window-seat.webp; do
+            test -s "$image"
+            test "$(head -c 4 "$image")" = "RIFF"
+            test "$(dd if="$image" bs=1 skip=8 count=4 status=none)" = "WEBP"
+            echo "Publishing valid image: $image ($(wc -c < "$image") bytes)"
+          done
           grep -q '/coffee-shop/' dist/index.html
-          find dist/images -maxdepth 1 -type f -printf '%f %s bytes\n'
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -80,6 +112,6 @@ jobs:
               sha: context.sha,
               state: success ? 'success' : 'failure',
               context: 'github-pages/maison-fleur',
-              description: success ? 'Maison Fleur and all image assets are published' : 'Maison Fleur deployment failed',
+              description: success ? 'Maison Fleur images decoded and published' : 'Maison Fleur deployment failed',
               target_url: success && process.env.PAGE_URL ? process.env.PAGE_URL : runUrl,
             });
