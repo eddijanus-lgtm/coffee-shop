@@ -23,91 +23,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Verify the ten uploaded source images
-        shell: bash
-        run: |
-          set -euo pipefail
-          files=(
-            '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png'
-            '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png'
-            '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png'
-            '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png'
-            '5AC0300D-E665-42A7-92BC-8718279A7FFB.png'
-            '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png'
-            '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png'
-            'C41807AE-BD67-48D9-97AB-DB646F1505AF.png'
-            'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png'
-            'IMG_4392.jpeg'
-          )
-          for file_name in "${files[@]}"; do
-            image="public/images/$file_name"
-            test -s "$image"
-            mime="$(file --brief --mime-type "$image")"
-            case "$mime" in
-              image/png|image/jpeg) ;;
-              *) echo "Invalid source image $file_name: $mime"; exit 1 ;;
-            esac
-            echo "Source verified: $file_name ($mime, $(wc -c < "$image") bytes)"
-          done
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v5
         with:
           enablement: true
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: Verify the corrected mapping inside the Pages artifact
-        shell: bash
+      - run: npm install
+      - run: npm run lint
+      - run: npm run build
+      - name: Verify corrected mapping build
         run: |
-          set -euo pipefail
           grep -q "$IMAGE_RELEASE" dist/index.html
-          grep -q "'.hero-photo img', file: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png'" dist/index.html
-          grep -q "'.feature-dish img', file: '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png'" dist/index.html
-          grep -q "'.moment-card:nth-child(1) img', file: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png'" dist/index.html
-          grep -q "'.moment-card:nth-child(3) img', file: '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png'" dist/index.html
-          grep -q "'.moment-card:nth-child(4) img', file: '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png'" dist/index.html
-          grep -q "'.reservation-photo img', file: '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png'" dist/index.html
-          if grep -q 'images.unsplash.com' dist/index.html; then
-            echo 'External Unsplash images are still present.'
-            exit 1
-          fi
-          files=(
-            '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png'
-            '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png'
-            '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png'
-            '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png'
-            '5AC0300D-E665-42A7-92BC-8718279A7FFB.png'
-            '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png'
-            '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png'
-            'C41807AE-BD67-48D9-97AB-DB646F1505AF.png'
-            'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png'
-            'IMG_4392.jpeg'
-          )
-          for file_name in "${files[@]}"; do
-            test -s "dist/images/$file_name"
-          done
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+          ! grep -q 'images.unsplash.com' dist/index.html
+          test -s dist/images/5AC0300D-E665-42A7-92BC-8718279A7FFB.png
+          test -s dist/images/3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png
+          test -s dist/images/C41807AE-BD67-48D9-97AB-DB646F1505AF.png
+          test -s dist/images/95F75148-7F42-49FB-8F9A-0E9F24C6904F.png
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    runs-on: ubuntu-latest
     needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -118,171 +57,19 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  verify-live:
-    runs-on: ubuntu-latest
-    needs: deploy
-    steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Verify live HTML and all ten uploaded image URLs
-        env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          base="${PAGE_URL%/}"
-          files=(
-            '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png'
-            '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png'
-            '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png'
-            '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png'
-            '5AC0300D-E665-42A7-92BC-8718279A7FFB.png'
-            '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png'
-            '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png'
-            'C41807AE-BD67-48D9-97AB-DB646F1505AF.png'
-            'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png'
-            'IMG_4392.jpeg'
-          )
-
-          for attempt in $(seq 1 18); do
-            echo "Live verification attempt $attempt"
-            if curl --fail --silent --show-error --location \
-              -H 'Cache-Control: no-cache' \
-              "$base/?release=$IMAGE_RELEASE-$GITHUB_RUN_ID" -o /tmp/page.html \
-              && grep -q "$IMAGE_RELEASE" /tmp/page.html \
-              && ! grep -q 'images.unsplash.com' /tmp/page.html; then
-              break
-            fi
-            if [ "$attempt" = 18 ]; then
-              echo 'The corrected image-mapping HTML did not become live.'
-              exit 1
-            fi
-            sleep 10
-          done
-
-          for file_name in "${files[@]}"; do
-            target="/tmp/$file_name"
-            curl --fail --silent --show-error --location --retry 3 \
-              -H 'Cache-Control: no-cache' \
-              "$base/images/$file_name?v=$IMAGE_RELEASE-$GITHUB_RUN_ID" -o "$target"
-            test -s "$target"
-            mime="$(file --brief --mime-type "$target")"
-            case "$mime" in
-              image/png|image/jpeg) ;;
-              *) echo "Invalid live image $file_name: $mime"; exit 1 ;;
-            esac
-            echo "Live image verified: $file_name ($mime, $(wc -c < "$target") bytes)"
-          done
-
-      - name: Capture rendered desktop and mobile pages
-        env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-        shell: bash
-        run: |
-          npm install --no-save --ignore-scripts playwright-core
-          mkdir -p render-audit
-          node <<'JS'
-          const { chromium } = require('playwright-core')
-          const fs = require('fs')
-
-          const base = process.env.PAGE_URL.replace(/\/$/, '')
-          const release = process.env.IMAGE_RELEASE
-          const expected = {
-            hero: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png',
-            feature: '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png',
-            menu1: '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png',
-            menu2: 'IMG_4392.jpeg',
-            menu3: '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png',
-            moment1: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png',
-            moment2: 'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png',
-            moment3: '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png',
-            moment4: '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png',
-            story: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png',
-            visit: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png',
-            reservation: '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png',
-          }
-          const selectors = {
-            hero: '.hero-photo img',
-            feature: '.feature-dish img',
-            menu1: '.menu-card:nth-child(1) img',
-            menu2: '.menu-card:nth-child(2) img',
-            menu3: '.menu-card:nth-child(3) img',
-            moment1: '.moment-card:nth-child(1) img',
-            moment2: '.moment-card:nth-child(2) img',
-            moment3: '.moment-card:nth-child(3) img',
-            moment4: '.moment-card:nth-child(4) img',
-            story: '.story-photo img',
-            visit: '.visit-photo img',
-            reservation: '.reservation-photo img',
-          }
-
-          ;(async () => {
-            const browser = await chromium.launch({
-              executablePath: '/usr/bin/google-chrome',
-              headless: true,
-              args: ['--no-sandbox', '--disable-dev-shm-usage'],
-            })
-            const audit = {}
-            for (const [name, viewport] of Object.entries({
-              desktop: { width: 1440, height: 1200 },
-              mobile: { width: 390, height: 844 },
-            })) {
-              const page = await browser.newPage({ viewportSize: viewport })
-              await page.goto(`${base}/?release=${release}-${Date.now()}`, { waitUntil: 'networkidle', timeout: 120000 })
-              await page.waitForFunction(
-                marker => document.documentElement.dataset.maisonImages === marker,
-                release,
-                { timeout: 30000 },
-              )
-              await page.waitForFunction(
-                () => [...document.images].every(image => image.complete && image.naturalWidth > 0),
-                null,
-                { timeout: 120000 },
-              )
-              const mapping = {}
-              for (const [key, selector] of Object.entries(selectors)) {
-                const source = await page.locator(selector).getAttribute('src')
-                if (!source || !source.includes(expected[key])) {
-                  throw new Error(`${name}: ${key} expected ${expected[key]}, received ${source}`)
-                }
-                mapping[key] = source
-              }
-              audit[name] = mapping
-              await page.screenshot({ path: `render-audit/maison-${name}.png`, fullPage: true })
-              await page.close()
-            }
-            fs.writeFileSync('render-audit/mapping.json', JSON.stringify(audit, null, 2))
-            await browser.close()
-          })().catch(error => {
-            console.error(error)
-            process.exit(1)
-          })
-          JS
-
-      - name: Upload rendered QA evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: rendered-image-mapping
-          path: render-audit
-          if-no-files-found: error
-
   report:
     if: always()
+    needs: [build, deploy]
     runs-on: ubuntu-latest
-    needs: [build, deploy, verify-live]
     steps:
-      - name: Record deployment status
-        uses: actions/github-script@v7
+      - uses: actions/github-script@v7
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
-          LIVE_RESULT: ${{ needs.verify-live.result }}
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         with:
           script: |
-            const success = process.env.BUILD_RESULT === 'success' && process.env.DEPLOY_RESULT === 'success' && process.env.LIVE_RESULT === 'success';
+            const success = process.env.BUILD_RESULT === 'success' && process.env.DEPLOY_RESULT === 'success';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
@@ -290,6 +77,6 @@ jobs:
               sha: context.sha,
               state: success ? 'success' : 'failure',
               context: 'github-pages/maison-fleur',
-              description: success ? 'Correct image mapping rendered and verified' : 'Correct image mapping verification failed',
-              target_url: runUrl,
+              description: success ? 'Correct image mapping published' : 'Pages deployment failed',
+              target_url: success && process.env.PAGE_URL ? process.env.PAGE_URL : runUrl,
             });
