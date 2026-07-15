@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_RELEASE: correct-mapping-v3
+  IMAGE_RELEASE: story-cafe-v1
 
 jobs:
   build:
@@ -32,14 +32,13 @@ jobs:
       - run: npm install
       - run: npm run lint
       - run: npm run build
-      - name: Verify corrected mapping build
+      - name: Verify story image build
         run: |
           grep -q "$IMAGE_RELEASE" dist/index.html
           ! grep -q 'images.unsplash.com' dist/index.html
+          test -s dist/images/story-cafe.webp
           test -s dist/images/5AC0300D-E665-42A7-92BC-8718279A7FFB.png
           test -s dist/images/3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png
-          test -s dist/images/C41807AE-BD67-48D9-97AB-DB646F1505AF.png
-          test -s dist/images/95F75148-7F42-49FB-8F9A-0E9F24C6904F.png
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -77,6 +76,6 @@ jobs:
               sha: context.sha,
               state: success ? 'success' : 'failure',
               context: 'github-pages/maison-fleur',
-              description: success ? 'Correct image mapping published' : 'Pages deployment failed',
+              description: success ? 'Story café image published' : 'Pages deployment failed',
               target_url: success && process.env.PAGE_URL ? process.env.PAGE_URL : runUrl,
             });
