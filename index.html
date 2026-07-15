@@ -6,11 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#fbf5f1" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./gallery-v4.css?v=gallery-copy-v4" />
     <meta property="og:title" content="Maison Fleur & Café · Paris" />
     <meta property="og:description" content="Coffee, flowers and slow mornings in Le Marais." />
     <meta property="og:image" content="https://eddijanus-lgtm.github.io/coffee-shop/images/5AC0300D-E665-42A7-92BC-8718279A7FFB.png?v=correct-mapping-v3" />
     <meta name="description" content="Maison Fleur & Café — coffee, flowers and slow mornings in Le Marais, Paris." />
     <meta name="maison-image-release" content="correct-mapping-v3" />
+    <meta name="maison-gallery-release" content="gallery-copy-v4" />
     <title>Maison Fleur & Café · Paris</title>
   </head>
   <body>
@@ -19,6 +21,7 @@
       (() => {
         const deploymentMarker = 'correct-mapping-v3'
         const assetVersion = 'correct-mapping-v3-20260715'
+        const galleryVersion = 'gallery-copy-v4'
         const assignments = [
           { selector: '.hero-photo img', file: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png', eager: true },
           { selector: '.feature-dish img', file: '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png', eager: true },
@@ -33,8 +36,53 @@
           { selector: '.visit-photo img', file: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png' },
           { selector: '.reservation-photo img', file: '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png' },
         ]
+        const galleryCopy = [
+          {
+            title: 'Behind the bar',
+            description: 'Our espresso bar starts early, with fresh pastries, quiet preparation and the first carefully poured cups of the day.',
+          },
+          {
+            title: 'Brunch, slowly',
+            description: 'Warm pastries, seasonal fruit and coffee made for long conversations rather than hurried mornings.',
+          },
+          {
+            title: 'A table outside',
+            description: 'The terrace is our favourite place for brunch in the soft Paris morning light, surrounded by flowers.',
+          },
+          {
+            title: 'The quiet corner',
+            description: 'A sunny window seat for one more cappuccino, a newspaper and nowhere else you need to be.',
+          },
+        ]
 
         const imageUrl = (file) => new URL(`images/${file}?v=${assetVersion}`, document.baseURI).href
+
+        const enhanceGallery = () => {
+          document.querySelectorAll('.moment-card').forEach((card, index) => {
+            const copy = galleryCopy[index]
+            const caption = card.querySelector('figcaption')
+            if (!copy || !caption) return
+            if (
+              caption.dataset.galleryCopy === galleryVersion
+              && caption.querySelector('.moment-card-title')
+              && caption.querySelector('.moment-card-description')
+            ) return
+
+            caption.dataset.galleryCopy = galleryVersion
+            caption.replaceChildren()
+
+            const title = document.createElement('h3')
+            title.className = 'moment-card-title'
+            title.textContent = copy.title
+
+            const description = document.createElement('p')
+            description.className = 'moment-card-description'
+            description.textContent = copy.description
+
+            caption.append(title, description)
+          })
+          document.documentElement.dataset.maisonGallery = galleryVersion
+        }
 
         const applyImages = () => {
           let found = 0
@@ -51,6 +99,7 @@
             if (assignment.eager) image.fetchPriority = 'high'
             image.src = target
           }
+          enhanceGallery()
           if (found === assignments.length) {
             document.documentElement.dataset.maisonImages = deploymentMarker
           }
