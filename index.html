@@ -8,7 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta property="og:title" content="Maison Fleur & Café · Paris" />
     <meta property="og:description" content="Coffee, flowers and slow mornings in Le Marais." />
-    <meta property="og:image" content="https://eddijanus-lgtm.github.io/coffee-shop/images/terrace.webp?v=20260715-4" />
+    <meta property="og:image" content="https://eddijanus-lgtm.github.io/coffee-shop/images/terrace.webp?asset=verified-binary-9" />
     <meta name="description" content="Maison Fleur & Café — coffee, flowers and slow mornings in Le Marais, Paris." />
     <title>Maison Fleur & Café · Paris</title>
   </head>
@@ -17,13 +17,13 @@
     <script>
       (() => {
         const imageBase = '/coffee-shop/images/'
-        const imageVersion = '20260715-4'
+        const imageVersion = 'verified-binary-9'
         const rewriteImage = (image) => {
           const rawSource = image.getAttribute('src') || ''
           if (!rawSource.includes('images/')) return
           const fileName = rawSource.split('/').pop().split('?')[0]
           if (!fileName) return
-          const target = `${imageBase}${fileName}?v=${imageVersion}`
+          const target = `${imageBase}${fileName}?asset=${imageVersion}`
           if (image.getAttribute('src') !== target) image.setAttribute('src', target)
         }
         const rewriteAllImages = (root = document) => {
@@ -32,21 +32,12 @@
         }
         const observer = new MutationObserver((mutations) => {
           mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.target instanceof HTMLImageElement) {
-              rewriteImage(mutation.target)
-              return
-            }
             mutation.addedNodes.forEach((node) => {
               if (node instanceof Element) rewriteAllImages(node)
             })
           })
         })
-        observer.observe(document.documentElement, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['src'],
-        })
+        observer.observe(document.documentElement, { childList: true, subtree: true })
         window.addEventListener('DOMContentLoaded', () => rewriteAllImages())
       })()
     </script>
