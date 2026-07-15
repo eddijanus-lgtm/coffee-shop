@@ -33,6 +33,14 @@ jobs:
         run: npm run lint
       - name: Build
         run: npm run build
+      - name: Verify generated café images are in the Pages artifact
+        run: |
+          test -s dist/images/barista-interior.webp
+          test -s dist/images/brunch-closeup.webp
+          test -s dist/images/terrace.webp
+          test -s dist/images/window-seat.webp
+          grep -q '/coffee-shop/' dist/index.html
+          find dist/images -maxdepth 1 -type f -printf '%f %s bytes\n'
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -72,6 +80,6 @@ jobs:
               sha: context.sha,
               state: success ? 'success' : 'failure',
               context: 'github-pages/maison-fleur',
-              description: success ? 'Maison Fleur is published' : 'Maison Fleur deployment failed',
+              description: success ? 'Maison Fleur and all image assets are published' : 'Maison Fleur deployment failed',
               target_url: success && process.env.PAGE_URL ? process.env.PAGE_URL : runUrl,
             });
