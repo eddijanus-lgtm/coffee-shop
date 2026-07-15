@@ -17,13 +17,21 @@ jobs:
         with:
           ref: main
 
+      - name: Verify source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .bootstrap/source.tar.gz
+          gzip -t .bootstrap/source.tar.gz
+          tar -tzf .bootstrap/source.tar.gz > /dev/null
+
       - name: Restore complete website source
         shell: bash
         run: |
           set -euo pipefail
-          cp .bootstrap/source.tar.gz /tmp/maison-source.tar.gz
-          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          tar -xzf /tmp/maison-source.tar.gz -C .
+          tar -xzf .bootstrap/source.tar.gz -C .
+          rm -rf .bootstrap
+          rm -f .github/workflows/bootstrap.yml
           printf '%s\n' 'node_modules' 'dist' '.DS_Store' '*.local' 'npm-debug.log*' > .gitignore
 
       - name: Set up Node
