@@ -8,97 +8,70 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta property="og:title" content="Maison Fleur & Café · Paris" />
     <meta property="og:description" content="Coffee, flowers and slow mornings in Le Marais." />
-    <meta property="og:image" content="https://eddijanus-lgtm.github.io/coffee-shop/images/0E29E7A1-D2BC-422D-A488-53D3187AEB93.png?v=exact-uploaded-ten" />
+    <meta property="og:image" content="https://eddijanus-lgtm.github.io/coffee-shop/images/E0ED9136-184C-4D77-A64D-16E5AAB8E018.png?v=direct-ten-v2" />
     <meta name="description" content="Maison Fleur & Café — coffee, flowers and slow mornings in Le Marais, Paris." />
-    <meta name="maison-image-release" content="exact-uploaded-ten" />
+    <meta name="maison-image-release" content="exact-uploaded-ten-abbefdbc" />
     <title>Maison Fleur & Café · Paris</title>
   </head>
   <body>
     <div id="root"></div>
     <script>
       (() => {
-        const release = 'exact-uploaded-ten-abbefdbc'
-        const base = '/coffee-shop/images/'
-        const uploadedFiles = [
-          '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png',
-          '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png',
-          '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png',
-          '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png',
-          '5AC0300D-E665-42A7-92BC-8718279A7FFB.png',
-          '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png',
-          '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png',
-          'C41807AE-BD67-48D9-97AB-DB646F1505AF.png',
-          'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png',
-          'IMG_4392.jpeg',
+        const deploymentMarker = 'exact-uploaded-ten-abbefdbc'
+        const assetVersion = 'direct-ten-v2-20260715'
+        const assignments = [
+          { selector: '.hero-photo img', file: 'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png', eager: true },
+          { selector: '.feature-dish img', file: '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png', eager: true },
+          { selector: '.menu-card:nth-child(1) img', file: '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png' },
+          { selector: '.menu-card:nth-child(2) img', file: '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png' },
+          { selector: '.menu-card:nth-child(3) img', file: '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png' },
+          { selector: '.moment-card:nth-child(1) img', file: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png' },
+          { selector: '.moment-card:nth-child(2) img', file: '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png' },
+          { selector: '.moment-card:nth-child(3) img', file: '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png' },
+          { selector: '.moment-card:nth-child(4) img', file: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png' },
+          { selector: '.story-photo img', file: 'IMG_4392.jpeg' },
+          { selector: '.visit-photo img', file: 'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png' },
+          { selector: '.reservation-photo img', file: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png' },
         ]
 
-        const sourceFor = (file) => `${base}${file}?v=${release}`
+        const imageUrl = (file) => new URL(`images/${file}?v=${assetVersion}`, document.baseURI).href
 
-        const loadAssets = () => Promise.all(uploadedFiles.map((file) => new Promise((resolve) => {
-          const probe = new Image()
-          probe.onload = () => resolve({
-            file,
-            source: sourceFor(file),
-            landscape: probe.naturalWidth >= probe.naturalHeight,
-          })
-          probe.onerror = () => resolve({ file, source: sourceFor(file), landscape: false })
-          probe.src = sourceFor(file)
-        })))
-
-        const setImage = (image, asset, priority = false) => {
-          if (!image || !asset || image.dataset.maisonExactImage === asset.file) return
-          image.dataset.maisonExactImage = asset.file
-          image.decoding = 'async'
-          image.loading = priority ? 'eager' : 'lazy'
-          if (priority) image.fetchPriority = 'high'
-          image.src = asset.source
+        const applyImages = () => {
+          let found = 0
+          for (const assignment of assignments) {
+            const image = document.querySelector(assignment.selector)
+            if (!image) continue
+            found += 1
+            const target = imageUrl(assignment.file)
+            if (image.dataset.maisonDirectFile === assignment.file && image.src === target) continue
+            image.dataset.maisonDirectFile = assignment.file
+            image.removeAttribute('srcset')
+            image.decoding = 'async'
+            image.loading = assignment.eager ? 'eager' : 'lazy'
+            if (assignment.eager) image.fetchPriority = 'high'
+            image.src = target
+          }
+          if (found === assignments.length) {
+            document.documentElement.dataset.maisonImages = deploymentMarker
+          }
         }
 
-        loadAssets().then((assets) => {
-          const landscape = assets.filter((asset) => asset.landscape)
-          const portrait = assets.filter((asset) => !asset.landscape)
-          const take = (group, index) => group[index % group.length] || assets[index % assets.length]
+        let frame = 0
+        const scheduleApply = () => {
+          if (frame) return
+          frame = requestAnimationFrame(() => {
+            frame = 0
+            applyImages()
+          })
+        }
 
-          const apply = () => {
-            setImage(document.querySelector('.hero-photo img'), take(landscape, 0), true)
-            setImage(document.querySelector('.feature-dish img'), take(portrait, 0))
-
-            document.querySelectorAll('.menu-card img').forEach((image, index) => {
-              setImage(image, take(portrait, index + 1))
-            })
-
-            document.querySelectorAll('.moment-card--wide img').forEach((image, index) => {
-              setImage(image, take(landscape, index + 1))
-            })
-
-            document.querySelectorAll('.moment-card--tall img').forEach((image, index) => {
-              setImage(image, take(portrait, index + 4))
-            })
-
-            setImage(document.querySelector('.story-photo img'), take(landscape, 3))
-            setImage(document.querySelector('.visit-photo img'), take(landscape, 0))
-            setImage(document.querySelector('.reservation-photo img'), take(landscape, 2))
-
-            document.documentElement.dataset.maisonImages = 'exact-uploaded-ten'
-          }
-
-          let scheduled = false
-          const scheduleApply = () => {
-            if (scheduled) return
-            scheduled = true
-            requestAnimationFrame(() => {
-              scheduled = false
-              apply()
-            })
-          }
-
-          const observer = new MutationObserver(scheduleApply)
-          observer.observe(document.documentElement, { childList: true, subtree: true })
-          window.addEventListener('DOMContentLoaded', scheduleApply, { once: true })
-          scheduleApply()
-          setTimeout(scheduleApply, 250)
-          setTimeout(scheduleApply, 1000)
-        })
+        const observer = new MutationObserver(scheduleApply)
+        observer.observe(document.documentElement, { childList: true, subtree: true })
+        window.addEventListener('DOMContentLoaded', scheduleApply, { once: true })
+        scheduleApply()
+        setTimeout(scheduleApply, 100)
+        setTimeout(scheduleApply, 500)
+        setTimeout(scheduleApply, 1500)
       })()
     </script>
     <script type="module" src="/src/main.tsx"></script>
