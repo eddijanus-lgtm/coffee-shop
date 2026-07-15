@@ -8,7 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta property="og:title" content="Maison Fleur & Café · Paris" />
     <meta property="og:description" content="Coffee, flowers and slow mornings in Le Marais." />
-    <meta property="og:image" content="https://eddijanus-lgtm.github.io/coffee-shop/images/terrace.webp?asset=verified-binary-9" />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1600&q=85&fm=jpg" />
     <meta name="description" content="Maison Fleur & Café — coffee, flowers and slow mornings in Le Marais, Paris." />
     <title>Maison Fleur & Café · Paris</title>
   </head>
@@ -16,29 +16,45 @@
     <div id="root"></div>
     <script>
       (() => {
-        const imageBase = '/coffee-shop/images/'
-        const imageVersion = 'verified-binary-9'
-        const rewriteImage = (image) => {
+        const freshImages = {
+          'barista-interior.webp': 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1600&q=85&fm=jpg',
+          'brunch-closeup.webp': 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1400&q=85&fm=jpg',
+          'terrace.webp': 'https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1600&q=85&fm=jpg',
+          'window-seat.webp': 'https://images.unsplash.com/photo-1445116572660-236099ec97a0?auto=format&fit=crop&w=1400&q=85&fm=jpg',
+        }
+
+        const fallback = 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1400&q=85&fm=jpg'
+
+        const replaceImage = (image) => {
           const rawSource = image.getAttribute('src') || ''
-          if (!rawSource.includes('images/')) return
-          const fileName = rawSource.split('/').pop().split('?')[0]
-          if (!fileName) return
-          const target = `${imageBase}${fileName}?asset=${imageVersion}`
-          if (image.getAttribute('src') !== target) image.setAttribute('src', target)
+          const fileName = rawSource.split('/').pop()?.split('?')[0]
+          const target = fileName ? freshImages[fileName] : undefined
+          if (!target || image.dataset.freshCafeImage === 'true') return
+
+          image.dataset.freshCafeImage = 'true'
+          image.referrerPolicy = 'no-referrer'
+          image.onerror = () => {
+            image.onerror = null
+            image.src = fallback
+          }
+          image.src = target
         }
-        const rewriteAllImages = (root = document) => {
-          root.querySelectorAll?.('img').forEach(rewriteImage)
-          if (root instanceof HTMLImageElement) rewriteImage(root)
+
+        const replaceAllImages = (root = document) => {
+          root.querySelectorAll?.('img').forEach(replaceImage)
+          if (root instanceof HTMLImageElement) replaceImage(root)
         }
+
         const observer = new MutationObserver((mutations) => {
           mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-              if (node instanceof Element) rewriteAllImages(node)
+              if (node instanceof Element) replaceAllImages(node)
             })
           })
         })
+
         observer.observe(document.documentElement, { childList: true, subtree: true })
-        window.addEventListener('DOMContentLoaded', () => rewriteAllImages())
+        window.addEventListener('DOMContentLoaded', () => replaceAllImages())
       })()
     </script>
     <script type="module" src="/src/main.tsx"></script>
