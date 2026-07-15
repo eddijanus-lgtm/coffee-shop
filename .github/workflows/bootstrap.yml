@@ -3,6 +3,8 @@ name: Bootstrap and deploy Maison Fleur
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,8 +23,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout bootstrap commit
+      - name: Checkout main bootstrap source
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Restore complete website source
         shell: bash
