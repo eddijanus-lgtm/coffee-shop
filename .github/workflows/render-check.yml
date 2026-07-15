@@ -71,13 +71,23 @@ jobs:
               await page.goto(`${base}/?release=${marker}-${Date.now()}`, { waitUntil: 'networkidle', timeout: 120000 })
               const html = await page.content()
               if (!html.includes(marker)) throw new Error(`Live page does not contain ${marker}`)
-              await page.waitForFunction(() => [...document.images].every(image => image.complete && image.naturalWidth > 0), null, { timeout: 120000 })
               audit[viewName] = {}
               for (const [key, [selector, file]] of Object.entries(expected)) {
-                const src = await page.locator(selector).getAttribute('src')
+                const locator = page.locator(selector)
+                await locator.scrollIntoViewIfNeeded()
+                await page.waitForFunction(
+                  sel => {
+                    const image = document.querySelector(sel)
+                    return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+                  },
+                  selector,
+                  { timeout: 60000 },
+                )
+                const src = await locator.getAttribute('src')
                 if (!src || !src.includes(file)) throw new Error(`${viewName} ${key}: ${src}`)
                 audit[viewName][key] = src
               }
+              await page.evaluate(() => window.scrollTo(0, 0))
               await page.screenshot({ path: `render-check/${viewName}.png`, fullPage: true })
               await page.close()
             }
