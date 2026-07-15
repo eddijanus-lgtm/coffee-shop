@@ -1,86 +1,200 @@
-name: Image filename audit
+name: Rendered image mapping audit
 
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/image-audit.yml'
+      - 'index.html'
+      - 'src/**'
       - 'public/images/**'
   workflow_dispatch:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
   statuses: write
 
+concurrency:
+  group: pages-render-audit
+  cancel-in-progress: true
+
+env:
+  IMAGE_RELEASE: correct-mapping-v3
+
 jobs:
-  audit:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Pillow
-        run: python -m pip install --disable-pip-version-check pillow
-
-      - name: Create labelled contact sheet
-        shell: bash
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - run: npm install
+      - run: npm run lint
+      - run: npm run build
+      - name: Verify mapping marker
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          from PIL import Image, ImageDraw, ImageFont, ImageOps
+          grep -q "$IMAGE_RELEASE" dist/index.html
+          ! grep -q 'images.unsplash.com' dist/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
 
-          files = sorted([
-              *Path('public/images').glob('*.png'),
-              *Path('public/images').glob('*.jpg'),
-              *Path('public/images').glob('*.jpeg'),
-          ])
-          assert len(files) >= 10, f'Expected at least 10 images, found {len(files)}'
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
-          cols = 2
-          cell_w, cell_h = 620, 500
-          thumb_w, thumb_h = 580, 410
-          rows = (len(files) + cols - 1) // cols
-          sheet = Image.new('RGB', (cols * cell_w, rows * cell_h), 'white')
-          draw = ImageDraw.Draw(sheet)
-          font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
-          font = ImageFont.truetype(font_path, 22)
-          small = ImageFont.truetype(font_path, 17)
+  audit:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-          for index, path in enumerate(files):
-              image = Image.open(path).convert('RGB')
-              contained = ImageOps.contain(image, (thumb_w, thumb_h), Image.Resampling.LANCZOS)
-              col = index % cols
-              row = index // cols
-              x = col * cell_w + (cell_w - contained.width) // 2
-              y = row * cell_h + 18
-              sheet.paste(contained, (x, y))
-              label_y = row * cell_h + 438
-              draw.text((col * cell_w + 20, label_y), path.name, fill='black', font=font)
-              draw.text((col * cell_w + 20, label_y + 30), f'{image.width} × {image.height}', fill='#555555', font=small)
-              draw.rectangle((col * cell_w, row * cell_h, (col + 1) * cell_w - 1, (row + 1) * cell_h - 1), outline='#cccccc', width=2)
+      - name: Wait for corrected live page
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          base="${PAGE_URL%/}"
+          for attempt in $(seq 1 18); do
+            if curl --fail --silent --location \
+              -H 'Cache-Control: no-cache' \
+              "$base/?release=$IMAGE_RELEASE-$GITHUB_RUN_ID" -o /tmp/page.html \
+              && grep -q "$IMAGE_RELEASE" /tmp/page.html; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
 
-          Path('audit').mkdir(exist_ok=True)
-          sheet.save('audit/image-contact-sheet.jpg', quality=92)
-          print('\n'.join(path.name for path in files))
-          PY
+      - name: Render and verify desktop and mobile
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          npm install --no-save --ignore-scripts playwright-core
+          mkdir -p render-audit
+          node <<'JS'
+          const { chromium } = require('playwright-core')
+          const fs = require('fs')
+
+          const base = process.env.PAGE_URL.replace(/\/$/, '')
+          const release = process.env.IMAGE_RELEASE
+          const expected = {
+            hero: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png',
+            feature: '3BDCD8E5-9FE1-4017-ABBD-0CA8D905B166.png',
+            menu1: '4BD19963-EC4F-4BC9-AFD9-260B6A1ED467.png',
+            menu2: 'IMG_4392.jpeg',
+            menu3: '5371A4A2-A173-45B7-BE7C-D1C92307CAC5.png',
+            moment1: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png',
+            moment2: 'E0ED9136-184C-4D77-A64D-16E5AAB8E018.png',
+            moment3: '0E29E7A1-D2BC-422D-A488-53D3187AEB93.png',
+            moment4: '95F75148-7F42-49FB-8F9A-0E9F24C6904F.png',
+            story: 'C41807AE-BD67-48D9-97AB-DB646F1505AF.png',
+            visit: '5AC0300D-E665-42A7-92BC-8718279A7FFB.png',
+            reservation: '7CD2C2B7-BCEA-4040-847D-FC53A0385218.png',
+          }
+          const selectors = {
+            hero: '.hero-photo img',
+            feature: '.feature-dish img',
+            menu1: '.menu-card:nth-child(1) img',
+            menu2: '.menu-card:nth-child(2) img',
+            menu3: '.menu-card:nth-child(3) img',
+            moment1: '.moment-card:nth-child(1) img',
+            moment2: '.moment-card:nth-child(2) img',
+            moment3: '.moment-card:nth-child(3) img',
+            moment4: '.moment-card:nth-child(4) img',
+            story: '.story-photo img',
+            visit: '.visit-photo img',
+            reservation: '.reservation-photo img',
+          }
+
+          ;(async () => {
+            const browser = await chromium.launch({
+              executablePath: '/usr/bin/google-chrome',
+              headless: true,
+              args: ['--no-sandbox', '--disable-dev-shm-usage'],
+            })
+            const audit = {}
+            for (const [name, viewport] of Object.entries({
+              desktop: { width: 1440, height: 1200 },
+              mobile: { width: 390, height: 844 },
+            })) {
+              const page = await browser.newPage({ viewport })
+              await page.goto(`${base}/?release=${release}-${Date.now()}`, {
+                waitUntil: 'networkidle',
+                timeout: 120000,
+              })
+              await page.waitForFunction(
+                marker => document.documentElement.dataset.maisonImages === marker,
+                release,
+                { timeout: 30000 },
+              )
+              await page.waitForFunction(
+                () => [...document.images].every(image => image.complete && image.naturalWidth > 0),
+                null,
+                { timeout: 120000 },
+              )
+              const mapping = {}
+              for (const [key, selector] of Object.entries(selectors)) {
+                const source = await page.locator(selector).getAttribute('src')
+                if (!source || !source.includes(expected[key])) {
+                  throw new Error(`${name}: ${key} expected ${expected[key]}, received ${source}`)
+                }
+                mapping[key] = source
+              }
+              audit[name] = mapping
+              await page.screenshot({ path: `render-audit/maison-${name}.png`, fullPage: true })
+              await page.close()
+            }
+            fs.writeFileSync('render-audit/mapping.json', JSON.stringify(audit, null, 2))
+            await browser.close()
+          })().catch(error => {
+            console.error(error)
+            process.exit(1)
+          })
+          JS
 
       - uses: actions/upload-artifact@v4
         with:
-          name: image-audit
-          path: audit/image-contact-sheet.jpg
+          name: rendered-image-mapping
+          path: render-audit
           if-no-files-found: error
 
-      - name: Record audit run URL
-        if: always()
-        uses: actions/github-script@v7
+  report:
+    if: always()
+    needs: [build, deploy, audit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          AUDIT_RESULT: ${{ needs.audit.result }}
         with:
           script: |
+            const success = process.env.BUILD_RESULT === 'success' && process.env.DEPLOY_RESULT === 'success' && process.env.AUDIT_RESULT === 'success';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha: context.sha,
-              state: 'success',
-              context: 'image-audit/contact-sheet',
-              description: 'Labelled image contact sheet is available',
+              state: success ? 'success' : 'failure',
+              context: 'image-audit/rendered-mapping',
+              description: success ? 'Desktop and mobile mapping verified' : 'Rendered mapping audit failed',
               target_url: runUrl,
             });
