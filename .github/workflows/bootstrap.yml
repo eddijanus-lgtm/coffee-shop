@@ -20,40 +20,11 @@ jobs:
       - name: Restore complete website source
         shell: bash
         run: |
+          set -euo pipefail
           cp .bootstrap/source.tar.gz /tmp/maison-source.tar.gz
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           tar -xzf /tmp/maison-source.tar.gz -C .
-          cat > README.md <<'EOF'
-          # Maison Fleur & Café
-
-          Responsive café website based on the Maison Fleur & Café Figma design.
-
-          ## Stack
-          - React 19
-          - TypeScript
-          - Vite
-          - Responsive CSS design system
-          - GitHub Pages
-
-          ## Local development
-          ```bash
-          npm install
-          npm run dev
-          ```
-
-          ## Checks
-          ```bash
-          npm run lint
-          npm run build
-          ```
-          EOF
-          cat > .gitignore <<'EOF'
-          node_modules
-          dist
-          .DS_Store
-          *.local
-          npm-debug.log*
-          EOF
+          printf '%s\n' 'node_modules' 'dist' '.DS_Store' '*.local' 'npm-debug.log*' > .gitignore
 
       - name: Set up Node
         uses: actions/setup-node@v4
